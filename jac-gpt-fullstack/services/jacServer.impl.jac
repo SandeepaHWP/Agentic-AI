@@ -1,15 +1,18 @@
 import json;
 import os;
 import from datetime {datetime}
+import from byllm.types { StreamEvent }
 
 # Shared helper function for streaming responses with SSE format
 def stream_chat_response(response_generator: any, visitor: any) -> any {
    print("Starting response streaming...");
 
    response = "";
-   for chunk in response_generator {
-      response += chunk;
-      yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n";
+   for event in response_generator {
+      yield f"data: {json.dumps({'type': event.event_type, 'data': event.data})}\n\n";
+      if event.event_type == "chunk" {
+         response += event.data.get("content", "");
+      }
    }
 
    session_node = ([root-->(?:Session)](?id==visitor.session_id))[0];
@@ -66,9 +69,9 @@ impl OffTopicChat.chat {
       response = "Hello! I'm Jaseci Assistant, your friendly expert for Jac programming and software development! \n\nI'm here to help with:\n **Programming & Development**: Documentation references, algorithms, best practices\n **AI-First Programming**: How Jac revolutionizes development with native LLM integration\n **Object-Spatial Programming**: Jac's unique approach to data relationships\n **Cloud-Native Development**: Building scalable applications with zero DevOps\n **Learning & Concepts**: Programming concepts explained through Jac examples\n\nWhether you're curious about Jac specifically or have general programming questions, I'm happy to help and show you how Jac can make your development experience better!\n\nFor comprehensive learning resources, visit: https://www.jac-lang.org/\n\nWhat programming challenge can I help you solve today?";
    }
 
-   # Create a generator that yields the complete response
+   # Create a generator that yields the complete response as StreamEvent
    def generate_response() {
-      yield response;
+      yield StreamEvent(event_type="chunk", data={"content": response});
    }
 
    report stream_chat_response(generate_response(), visitor);

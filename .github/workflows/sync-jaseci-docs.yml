@@ -53,7 +53,7 @@ jobs:
       - name: Install dependencies for doc link generation
         run: |
           pip install --upgrade pip
-          pip install jaclang jac-byllm sentence-transformers numpy pyyaml python-dotenv
+          pip install jaclang byllm sentence-transformers numpy pyyaml python-dotenv
 
       - name: Generate documentation links with embeddings
         env:

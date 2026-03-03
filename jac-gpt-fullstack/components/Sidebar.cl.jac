@@ -278,7 +278,7 @@ def:pub Sidebar(
     sessionsContent = <Text size="sm" c={MUTED2} ta="center" py="lg">No chat history yet</Text>;
 
     if isExpanded and chatSessions.length > 0 {
-        sessionsContent = <Stack gap={4}>
+        sessionsContent = <Stack gap={8}>
             {chatSessions.map(lambda session: any -> any {
                 isCurrentSession = session.id == currentSessionId;
                 isHovered = hoveredSessionId == session.id;
@@ -365,9 +365,9 @@ def:pub Sidebar(
 
     chatSessionsList = None;
     if isExpanded {
-        chatSessionsList = <Box px="md" style={{"flex": "1", "overflow": "hidden"}}>
+        chatSessionsList = <Box px="md" style={{"height": "100%", "display": "flex", "flexDirection": "column", "overflow": "hidden"}}>
             <Text size="xs" fw={600} c={MUTED} tt="uppercase" mb="sm">Recent Chats</Text>
-            <ScrollArea style={{"height": "100%"}} type="scroll">
+            <ScrollArea style={{"flex": "1", "minHeight": "0"}} type="scroll">
                 {sessionsContent}
             </ScrollArea>
         </Box>;

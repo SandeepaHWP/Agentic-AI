@@ -138,7 +138,8 @@ def:pub JacChatbot() -> JsxElement {
     hasMessages = chat.messages.length > 0;
 
     loadingContent = None;
-    if chat.isLoading {
+    showThinking = chat.isLoading and not chat.isReasoning and chat.reasoningSteps.length == 0;
+    if showThinking {
         loadingContent = loadingIndicator;
     }
 

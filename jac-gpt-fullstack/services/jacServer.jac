@@ -7,6 +7,7 @@ import requests;
 import from byllm.lib {Model}
 import from dotenv {load_dotenv}
 import from services.rag_engine {RagEngine, load_config}
+import from services.mcp_client {McpClient}
 import from datetime {datetime}
 
 with entry {
@@ -35,6 +36,9 @@ glob rag_engine: RagEngine = RagEngine(
     top_n=app_config.get("rag_engine", {}).get("reranking", {}).get("top_n", 5),
     cross_encoder_model=app_config.get("rag_engine", {}).get("reranking", {}).get("model", "cross-encoder/ms-marco-MiniLM-L6-v2")
 );
+
+# Long-lived MCP client subprocess (stdio JSON-RPC, same pattern as list_mcp_sse.jac)
+glob mcp_client: McpClient = McpClient();
 
 node Router {
 }
@@ -73,6 +77,30 @@ def refer_full_language_examples() -> str {
     }
 }
 
+"""List all tools exposed by the project's MCP server so the LLM can
+decide which tool to call. Returns a formatted string with tool names,
+descriptions, and parameter names."""
+def list_available_mcp_tools() -> str {
+    try {
+        return mcp_client.get_tool_descriptions();
+    } except Exception as e {
+        return f"MCP tools unavailable: {e}";
+    }
+}
+
+"""Call an MCP tool by name. Pass tool arguments as a JSON-encoded string,
+e.g. '{\"query\": \"walkers in Jac\"}'. Use list_available_mcp_tools first
+to discover valid tool names and their parameter names.
+Returns the tool's text output or an error string."""
+def call_mcp_tool(tool_name: str, tool_args_json: str) -> str {
+    try {
+        tool_args = json.loads(tool_args_json) if tool_args_json else {};
+        return mcp_client.call_tool(name=tool_name, args=tool_args);
+    } except Exception as e {
+        return f"MCP call failed: {e}";
+    }
+}
+
 node RagChat {
 
     def respond(message: str, chat_history: list[dict]) -> str by llm(
@@ -81,7 +109,7 @@ node RagChat {
         temperature=0.5,
         stream = True,
         logging = True,
-        tools = [search_docs]
+        tools = [list_available_mcp_tools, call_mcp_tool]
     );
 
     can chat with interact entry;
@@ -108,7 +136,7 @@ node CodingChat {
         stream = True,
         logging = True,
         # max_react_iterations=5,
-        tools = [search_docs]
+        tools = [list_available_mcp_tools, call_mcp_tool]
     );
 
     can chat with interact entry;
@@ -122,7 +150,7 @@ node DebuggerChat {
         stream = True,
         logging = True,
         # max_react_iterations=5,
-        tools = [search_docs]
+        tools = [list_available_mcp_tools, call_mcp_tool]
     );
 
     can chat with interact entry;

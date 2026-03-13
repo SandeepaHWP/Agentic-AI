@@ -103,7 +103,16 @@ def call_mcp_tool(tool_name: str, tool_args_json: str) -> str {
 
 node RagChat {
 
-    def respond(message: str, chat_history: list[dict]) -> str by llm(
+    def respond_rag(message: str, chat_history: list[dict]) -> str by llm(
+        method="ReAct",
+        max_react_iterations=5,
+        temperature=0.5,
+        stream = True,
+        logging = True,
+        tools = [search_docs, refer_full_language_examples]
+    );
+
+    def respond_mcp(message: str, chat_history: list[dict]) -> str by llm(
         method="ReAct",
         max_react_iterations=5,
         temperature=0.5,
@@ -130,12 +139,19 @@ node QAChat {
 
 node CodingChat {
 
-    def code_jac(message: str, chat_history: list[dict]) -> str by llm(
+    def code_jac_rag(message: str, chat_history: list[dict]) -> str by llm(
         method="ReAct",
         messages=chat_history,
         stream = True,
         logging = True,
-        # max_react_iterations=5,
+        tools = [search_docs, refer_full_language_examples]
+    );
+
+    def code_jac_mcp(message: str, chat_history: list[dict]) -> str by llm(
+        method="ReAct",
+        messages=chat_history,
+        stream = True,
+        logging = True,
         tools = [list_available_mcp_tools, call_mcp_tool]
     );
 
@@ -144,12 +160,19 @@ node CodingChat {
 
 node DebuggerChat {
 
-    def debug_code(message: str, chat_history: list[dict]) -> str by llm(
+    def debug_code_rag(message: str, chat_history: list[dict]) -> str by llm(
         method="ReAct",
         messages=chat_history,
         stream = True,
         logging = True,
-        # max_react_iterations=5,
+        tools = [search_docs, refer_full_language_examples]
+    );
+
+    def debug_code_mcp(message: str, chat_history: list[dict]) -> str by llm(
+        method="ReAct",
+        messages=chat_history,
+        stream = True,
+        logging = True,
         tools = [list_available_mcp_tools, call_mcp_tool]
     );
 
@@ -172,6 +195,8 @@ walker :pub interact {
     has session_id: str;
     has user_email: str = "";
     has chat_history: list[dict] = [];
+    has mode: str = "";
+    has skip_history: bool = False;
 
     obj __specs__ {
         static has methods: list = ["post"];

@@ -1,34 +1,28 @@
-"""Long-lived MCP client singleton for the Jac GPT server.
+"""MCP client singleton using Streamable HTTP transport.
 
-Spawns `jac mcp --transport stdio` as a subprocess using the same
-newline-delimited JSON-RPC protocol as list_mcp_sse.jac and keeps the
-subprocess alive for the lifetime of the Jac server process.
+Connects to an MCP server running at `jac mcp --transport streamable-http --port 3001`
+via POST /mcp (bidirectional streaming with JSON-RPC over HTTP / SSE).
 
-Two functions defined at the bottom (list_available_mcp_tools and
-call_mcp_tool) are imported by jacServer.jac and passed as ReAct tools
-to LLM nodes, giving the LLM the choice between RAG and MCP on every turn.
+Imported by jacServer.jac and passed as ReAct tools to LLM nodes.
 """
 
 import json;
-import subprocess;
-import threading;
-import os;
+import requests;
 
 obj McpClient {
-    has proc: any = None;
+    has _base_url: str = "http://localhost:3001";
     has _tools: list = [];
     has _initialized: bool = False;
     has _rpc_id: int = 0;
+    has _session_id: str = "";
 
     def postinit() {
         try {
-            self._launch();
             self._initialize();
             self._list_tools();
             print(f"[MCP] Client ready — {len(self._tools)} tool(s) discovered.");
         } except Exception as e {
             print(f"[MCP] Startup warning: {e}. MCP tools will be unavailable.");
-            self.proc = None;
         }
     }
 
@@ -39,30 +33,39 @@ obj McpClient {
         return str(self._rpc_id);
     }
 
-    def _launch() {
-        # Server is always started from the project root (where jac.toml lives)
-        project_dir = os.getcwd();
-        self.proc = subprocess.Popen(
-            ["jac", "mcp", "--transport", "stdio"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            cwd=project_dir
-        );
+    def _build_headers(accept_sse: bool = True) -> dict {
+        headers = {"Content-Type": "application/json"};
+        if accept_sse {
+            headers["Accept"] = "application/json, text/event-stream";
+        } else {
+            headers["Accept"] = "application/json";
+        }
+        if self._session_id {
+            headers["Mcp-Session-Id"] = self._session_id;
+        }
+        return headers;
+    }
 
-        # Drain stderr in a daemon thread to prevent pipe deadlock
-        def _drain(stream: any) -> None {
-            try {
-                for line in stream {
-                    
+    def _capture_session(resp: any) -> None {
+        sid = resp.headers.get("Mcp-Session-Id");
+        if sid {
+            self._session_id = sid;
+        }
+    }
+
+    """Extract the last JSON-RPC response from an SSE text stream."""
+    def _parse_sse_response(text: str) -> dict {
+        last_data = {};
+        for line in text.strip().split("\n") {
+            if line.startswith("data: ") {
+                try {
+                    last_data = json.loads(line[6:]);
+                } except Exception {
+                    print(f"[MCP] Warning: Failed to parse SSE line as JSON: {line[6:]}");
                 }
-            } except Exception {
-                raise;
             }
         }
-        t = threading.Thread(target=_drain, args=[self.proc.stderr], daemon=True);
-        t.start();
+        return last_data;
     }
 
     def _send_rpc(method: str, params: dict = None) -> dict {
@@ -70,13 +73,20 @@ obj McpClient {
         if params {
             req["params"] = params;
         }
-        self.proc.stdin.write(json.dumps(req) + "\n");
-        self.proc.stdin.flush();
-        response_line = self.proc.stdout.readline();
-        if not response_line {
-            raise Exception(f"MCP server closed stdout waiting for '{method}'");
+        resp = requests.post(
+            f"{self._base_url}/mcp",
+            data=json.dumps(req),
+            headers=self._build_headers(),
+            timeout=60
+        );
+        resp.raise_for_status();
+        self._capture_session(resp);
+
+        content_type = resp.headers.get("Content-Type", "");
+        if "text/event-stream" in content_type {
+            return self._parse_sse_response(resp.text);
         }
-        return json.loads(response_line.strip());
+        return resp.json();
     }
 
     def _send_notification(method: str, params: dict = None) -> None {
@@ -84,8 +94,13 @@ obj McpClient {
         if params {
             body["params"] = params;
         }
-        self.proc.stdin.write(json.dumps(body) + "\n");
-        self.proc.stdin.flush();
+        resp = requests.post(
+            f"{self._base_url}/mcp",
+            data=json.dumps(body),
+            headers=self._build_headers(accept_sse=False),
+            timeout=10
+        );
+        self._capture_session(resp);
     }
 
     def _initialize() {
@@ -94,7 +109,6 @@ obj McpClient {
             "capabilities": {},
             "clientInfo": {"name": "jac-mcp-server-bridge", "version": "1.0.0"}
         });
-        # Fire-and-forget — no response expected
         self._send_notification("notifications/initialized");
         self._initialized = True;
     }
@@ -125,7 +139,7 @@ obj McpClient {
     """Call an MCP tool by name with the given arguments dict.
     Returns the tool's text output as a string, or an error description."""
     def call_tool(name: str, args: dict) -> str {
-        if not self.proc or not self._initialized {
+        if not self._initialized {
             return "MCP client is not available — use search_docs instead.";
         }
         try {
@@ -149,22 +163,6 @@ obj McpClient {
             return "MCP tool returned no content.";
         } except Exception as e {
             return f"MCP call failed: {e}";
-        }
-    }
-
-    """Shut down the MCP server subprocess cleanly."""
-    def close() {
-        if self.proc {
-            try {
-                self.proc.stdin.close();
-            } except Exception {
-                
-            }
-            try {
-                self.proc.wait(timeout=5);
-            } except Exception {
-                self.proc.kill();
-            }
         }
     }
 }

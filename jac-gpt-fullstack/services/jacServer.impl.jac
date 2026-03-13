@@ -23,27 +23,48 @@ def stream_chat_response(response_generator: any, visitor: any) -> any {
 }
 
 impl RagChat.chat {
-   print("Entering RAG node");
-   report stream_chat_response(
-      self.respond(message=visitor.message, chat_history=visitor.chat_history),
-      visitor
-   );
+   print("Entering RAG node, mode:", visitor.mode);
+   if visitor.mode == "mcp" {
+      report stream_chat_response(
+         self.respond_mcp(message=visitor.message, chat_history=visitor.chat_history),
+         visitor
+      );
+   } else {
+      report stream_chat_response(
+         self.respond_rag(message=visitor.message, chat_history=visitor.chat_history),
+         visitor
+      );
+   }
 }
 
 impl CodingChat.chat {
-   print("Entering Coding node");
-   report stream_chat_response(
-      self.code_jac(message=visitor.message, chat_history=visitor.chat_history),
-      visitor
-   );
+   print("Entering Coding node, mode:", visitor.mode);
+   if visitor.mode == "mcp" {
+      report stream_chat_response(
+         self.code_jac_mcp(message=visitor.message, chat_history=visitor.chat_history),
+         visitor
+      );
+   } else {
+      report stream_chat_response(
+         self.code_jac_rag(message=visitor.message, chat_history=visitor.chat_history),
+         visitor
+      );
+   }
 }
 
 impl DebuggerChat.chat {
-   print("Entering Debugger node");
-   report stream_chat_response(
-      self.debug_code(message=visitor.message, chat_history=visitor.chat_history),
-      visitor
-   );
+   print("Entering Debugger node, mode:", visitor.mode);
+   if visitor.mode == "mcp" {
+      report stream_chat_response(
+         self.debug_code_mcp(message=visitor.message, chat_history=visitor.chat_history),
+         visitor
+      );
+   } else {
+      report stream_chat_response(
+         self.debug_code_rag(message=visitor.message, chat_history=visitor.chat_history),
+         visitor
+      );
+   }
 }
 
 impl QAChat.chat {
@@ -82,39 +103,39 @@ CRITICAL: You MUST return EXACTLY ONE single integer index. DO NOT return multip
 You are a message classifier for a Jac programming chatbot.
 Return ONLY one index number (0, 1, 2, 3, or 4) of the matching category.
 
-NODE MAPPING:
-0 = RAG (Technical Questions)
-1 = CODING (Code Generation)
-2 = CODE_DEBUGGER (Bug Fixes)
-3 = QA (Casual Conversation)
-4 = OFF_TOPIC (Unrelated Topics)
+NODE MAPPING (5 agents):
+0 = RagChat (Technical Questions)
+1 = CodingChat (Code Generation)
+2 = DebuggerChat (Bug Fixes)
+3 = QAChat (Casual Conversation)
+4 = OffTopicChat (Unrelated Topics)
 
 CLASSIFICATION RULES:
 
-INDEX 2 - CODE_DEBUGGER (Debugging & Error Fixing)
+INDEX 2 - DebuggerChat (Debugging & Error Fixing)
    - Keywords: "error", "bug", "issue", "exception", "not working", "doesn't work", "fails", "crash", "wrong output", "fix", "debug", "troubleshoot", "why isn't", "having trouble"
    - Examples: "I'm getting an error", "Fix this bug", "Why isn't my code running"
    → Return: 2
 
-INDEX 1 - CODING (Code Creation/Modification)
+INDEX 1 - CodingChat (Code Creation/Modification)
    - Keywords: "create", "write", "build", "generate", "update", "change", "modify", "add", "remove", "implement", "make"
    - Must be an action request on code, not just a question about it
    - Examples: "Create a walker", "Write code for", "Add a method", "Generate an example"
    → Return: 1
 
-INDEX 0 - RAG (Technical Questions — default for Jac/programming questions)
+INDEX 0 - RagChat (Technical Questions — default for Jac/programming questions)
    - Keywords: "what is", "how does", "explain", "tell me about", "describe", nodes, edges, byllm,  walkers, abilities, graphs
    - Any conceptual or documentation question about Jac/Jaseci
    - Examples: "What are walkers?", "How does Jac work?", "Explain abilities"
    → Return: 0
 
-INDEX 3 - QA (Pure Casual Conversation ONLY)
+INDEX 3 - QAChat (Pure Casual Conversation ONLY)
    - Keywords: "hi", "hello", "hey", "thanks", "ok", "got it", "sure", "good morning"
    - CRITICAL: If ANY technical or programming term is present → NOT QA
    - Examples: "Hey!", "Thanks a lot", "Got it"
    → Return: 3
 
-INDEX 4 - OFF_TOPIC (Non-Jac Topics)
+INDEX 4 - OffTopicChat (Non-Jac Topics)
    - Completely unrelated to programming, OR about programming/tech but NOT Jac-specific
    - Examples: "What's the weather?", "How do I do this in Python?"
    → Return: 4
@@ -124,34 +145,69 @@ FINAL REMINDER: Return ONLY A SINGLE INTEGER (0, 1, 2, 3, or 4). Nothing else
 
 # - Never generate new code - only curate existing examples.
 
-sem RagChat.respond = """
-Jac/Jaseci documentation expert. For every query:
+sem RagChat.respond_rag = """
+Jac/Jaseci documentation expert using local vector search only. For every query:
 - Call search_docs for EACH concept separately before answering — never rely on prior knowledge or chat history as a source of answers; use chat history only to form better search queries.
+- Also call refer_full_language_examples to access complete Jac language examples if needed.
 - Base answers strictly on what search_docs returns; if docs don't cover it, say so.
 - Re-search with synonyms or related terms if initial results are insufficient; never repeat an identical search.
-- If cannot answer the query directly, call list_available_mcp_tools to see what live MCP tools are available, then call call_mcp_tool with the appropriate tool name and args string to fetch real-time data or perform actions beyond static docs.
 - Explain *why* it matters, not just *what* it is; for code concepts include: a step-by-step breakdown of each keyword/construct involved, then a declaration example, then a separate usage example.
 - End with a one-line citation of the documentation topic/section names used (not file paths); wrap all Jac code in ```jac``` blocks; use Markdown structure and bullet points.
 """;
 
-sem CodingChat.code_jac = """
+sem RagChat.respond_mcp = """
+Jac/Jaseci documentation expert using MCP tools. For every query:
+You have TWO tools available: list_available_mcp_tools and call_mcp_tool.
+- FIRST, call the tool list_available_mcp_tools (with NO arguments) to discover MCP tool names.
+- THEN, call the tool call_mcp_tool with the discovered tool_name and tool_args_json.
+- NEVER pass "list_available_mcp_tools" as the tool_name argument to call_mcp_tool.
+- Base answers strictly on what MCP tools return; if tools don't cover it, say so.
+- Explain *why* it matters, not just *what* it is; for code concepts include: a step-by-step breakdown of each keyword/construct involved, then a declaration example, then a separate usage example.
+- End with a one-line citation of the documentation topic/section names used (not file paths); wrap all Jac code in ```jac``` blocks; use Markdown structure and bullet points.
+""";
+
+sem CodingChat.code_jac_rag = """
 Jac code writer that generates or modifies code based on user requests and conversation history.
 - Never rely on prior Jac knowledge (it is outdated); use search_docs to verify syntax or language concepts — decompose the request into parts and search each separately (e.g. "walker syntax", "node declaration", "import syntax").
+- Also call refer_full_language_examples to access complete Jac language examples if needed.
 - Do NOT use search_docs for trivial changes such as renaming, adding attributes, updating values, or formatting.
-- If needed, call list_available_mcp_tools to discover available MCP tools, then call call_mcp_tool with the correct tool name and args string.
 - Always output the ENTIRE updated code, never partial snippets; apply only the requested changes — never remove or modify working code unless explicitly asked.
 - Response order: briefly explain what changed → then provide the full updated code; do not restate unchanged logic.
 - If `by llm()` is used, ensure it is imported and instantiated; wrap all Jac code in ```jac``` blocks.
 """;
 
-sem DebuggerChat.debug_code = """
+sem CodingChat.code_jac_mcp = """
+Jac code writer that generates or modifies code based on user requests and conversation history.
+You have TWO tools available: list_available_mcp_tools and call_mcp_tool.
+- FIRST, call the tool list_available_mcp_tools (with NO arguments) to discover MCP tool names.
+- THEN, call the tool call_mcp_tool with the discovered tool_name and tool_args_json.
+- NEVER pass "list_available_mcp_tools" as the tool_name argument to call_mcp_tool.
+- Never rely on prior Jac knowledge (it is outdated); call list_available_mcp_tools with no arguments to discover available MCP tools, then call call_mcp_tool with the correct tool name and args string to look up syntax or language concepts.
+- Always output the ENTIRE updated code, never partial snippets; apply only the requested changes — never remove or modify working code unless explicitly asked.
+- Response order: briefly explain what changed → then provide the full updated code; do not restate unchanged logic.
+- If `by llm()` is used, ensure it is imported and instantiated; wrap all Jac code in ```jac``` blocks.
+""";
+
+sem DebuggerChat.debug_code_rag = """
 Jac code debugger that identifies and fixes all issues in the provided code.
 - Fix ALL issue types: syntax errors, logical errors, runtime errors, and incorrect/non-idiomatic Jac usage.
 - For any uncertain Jac syntax or construct, use search_docs — decompose the code into parts and search each separately (e.g. "walker syntax", "import syntax", "visit syntax").
-- If needed, call list_available_mcp_tools first, then call call_mcp_tool with the correct tool name and args string.
+- Also call refer_full_language_examples to access complete Jac language examples if needed.
 - Jac-specific rule: `import from module { item }` statements do NOT end with a semicolon.
 - Response order: first explain what was wrong and *why* → then provide the complete corrected code; never output partial snippets.
-- Do not introduce features or refactors beyond what is needed to fix the issue; wrap all Jac code in ```jac``` blocks .
+- Do not introduce features or refactors beyond what is needed to fix the issue; wrap all Jac code in ```jac``` blocks.
+""";
+
+sem DebuggerChat.debug_code_mcp = """
+Jac code debugger that identifies and fixes all issues in the provided code.
+- Fix ALL issue types: syntax errors, logical errors, runtime errors, and incorrect/non-idiomatic Jac usage.
+You have TWO tools available: list_available_mcp_tools and call_mcp_tool.
+- FIRST, call the tool list_available_mcp_tools (with NO arguments) to discover MCP tool names.
+- THEN, call the tool call_mcp_tool with the discovered tool_name and tool_args_json.
+- NEVER pass "list_available_mcp_tools" as the tool_name argument to call_mcp_tool.
+- Jac-specific rule: `import from module { item }` statements do NOT end with a semicolon.
+- Response order: first explain what was wrong and *why* → then provide the complete corrected code; never output partial snippets.
+- Do not introduce features or refactors beyond what is needed to fix the issue; wrap all Jac code in ```jac``` blocks.
 """;
 
 sem QAChat.respond = """Friendly Jaseci Assistant for basic greetings and casual conversation.
@@ -174,9 +230,11 @@ impl Session.chat {
       self.user_email = visitor.user_email;
    }
 
-   # Save user message to chat history
-   self.chat_history.append({"role": "user", "content": visitor.message});
-   self.updated_at = datetime.now().isoformat();
+   # Save user message to chat history only for the primary call (not skip_history)
+   if not visitor.skip_history {
+      self.chat_history.append({"role": "user", "content": visitor.message});
+      self.updated_at = datetime.now().isoformat();
+   }
 
    visitor.chat_history = self.chat_history;
 

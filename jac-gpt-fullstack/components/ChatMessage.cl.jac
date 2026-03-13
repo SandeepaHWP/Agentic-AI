@@ -194,7 +194,7 @@ def:pub JacCodeBlock(code: str) -> JsxElement {
 }
 
 """Chat message component."""
-def:pub ChatMessage(message: str, isUser: bool, timestamp: any = null) -> JsxElement {
+def:pub ChatMessage(message: str, isUser: bool, timestamp: any = null, source: str = "") -> JsxElement {
 
     ORANGE = "#f97316";
     logoSrc = "/logo.png";
@@ -369,8 +369,36 @@ def:pub ChatMessage(message: str, isUser: bool, timestamp: any = null) -> JsxEle
     };
 
     # Bot message - left aligned
+    sourceLabel = None;
+    if source == "RAG" {
+        sourceLabel = <div style={{
+            "display": "inline-flex",
+            "alignItems": "center",
+            "marginBottom": "6px",
+            "padding": "2px 10px",
+            "borderRadius": "12px",
+            "background": "rgba(59, 130, 246, 0.15)",
+            "border": "1px solid rgba(59, 130, 246, 0.35)"
+        }}>
+            <Text size="xs" fw={600} style={{"color": "#93c5fd", "letterSpacing": "0.03em"}}>RAG Response</Text>
+        </div>;
+    } elif source == "MCP" {
+        sourceLabel = <div style={{
+            "display": "inline-flex",
+            "alignItems": "center",
+            "marginBottom": "6px",
+            "padding": "2px 10px",
+            "borderRadius": "12px",
+            "background": "rgba(168, 85, 247, 0.15)",
+            "border": "1px solid rgba(168, 85, 247, 0.35)"
+        }}>
+            <Text size="xs" fw={600} style={{"color": "#c4b5fd", "letterSpacing": "0.03em"}}>MCP Response</Text>
+        </div>;
+    }
+
     return <Box py="sm" px="xs" style={{"animation": "fadeIn 0.3s ease"}}>
         <Box style={{"flex": "1", "minWidth": "0"}}>
+            {sourceLabel}
             <ReactMarkdown components={components}>
                 {message}
             </ReactMarkdown>

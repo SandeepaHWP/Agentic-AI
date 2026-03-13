@@ -25,7 +25,7 @@ def get_yaml_loader() -> Any {
     loader = yaml.SafeLoader;
     
     # Add constructor that ignores unknown tags
-    def ignore_unknown(ldr: Any, tag_suffix: str, node: Any) -> Any {
+    def ignore_unknown(ldr: Any, tag_suffix: str, yaml_node: Any) -> Any {
         return None;
     }
     

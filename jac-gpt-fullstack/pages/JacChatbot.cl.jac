@@ -70,9 +70,21 @@ def:pub JacChatbot() -> JsxElement {
     }
 
     # Build message items - split to insert reasoning before the streaming message
+    # Find last user message ID for scroll-to-top ref
+    lastUserMsgId = "";
+    for msg in chat.messages {
+        if msg.isUser {
+            lastUserMsgId = msg.id;
+        }
+    }
+
     allMessageItems = [];
     for msg in chat.messages {
-        allMessageItems.push(<div key={msg.id} style={{"animation": "fadeIn 0.3s ease"}}>
+        msgRef = None;
+        if msg.id == lastUserMsgId {
+            msgRef = chat.latestUserMsgRef;
+        }
+        allMessageItems.push(<div key={msg.id} ref={msgRef} style={{"animation": "fadeIn 0.3s ease", "scrollMarginTop": "16px"}}>
             <ChatMessage
                 message={msg.content}
                 isUser={msg.isUser}
@@ -175,6 +187,7 @@ def:pub JacChatbot() -> JsxElement {
                     {loadingContent}
                 </div>
                 <div ref={chat.messagesEndRef} />
+                <div style={{"minHeight": "70vh"}} />
             </div>
         </ScrollArea>;
     } else {

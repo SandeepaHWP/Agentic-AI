@@ -73,12 +73,12 @@ def:pub useChat() -> any {
     }, [messages]);
 
     # Re-anchor scroll after full response stream completes
-    # Use instant (no animation) to prevent visible flicker when reasoning collapses
+    # Use auto (no animation) to prevent visible flicker when reasoning collapses
     useEffect(lambda -> None {
         if streamDoneSignal > 0 {
             requestAnimationFrame(lambda -> None {
                 if latestUserMsgRef.current {
-                    latestUserMsgRef.current.scrollIntoView({"behavior": "instant", "block": "start"});
+                    latestUserMsgRef.current.scrollIntoView({"behavior": "auto", "block": "start"});
                 }
             });
         }

@@ -265,12 +265,6 @@ def:pub useChat() -> any {
                     };
                 }
             }
-            
-            # Clear abort controller after completion
-            abortControllerRef.current = None;
-
-            # Signal that streaming is fully done so scroll re-anchors
-            streamDoneSignal = lambda prev: int -> int { return prev + 1; };
         } except Exception as e {
             console.error("Send message error:", e);
             errorMessage = {
@@ -282,6 +276,12 @@ def:pub useChat() -> any {
             messages = lambda prev: any -> any { return prev.concat([errorMessage]); };
             # Stop loading on error
             isLoading = False;
+        } finally {
+            # Clear abort controller after completion
+            abortControllerRef.current = None;
+
+            # Signal that streaming is fully done so scroll re-anchors
+            streamDoneSignal = lambda prev: int -> int { return prev + 1; };
         }
     }
 

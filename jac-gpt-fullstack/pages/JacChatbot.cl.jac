@@ -1,6 +1,6 @@
 # Main chatbot page component following complete specification
 
-import from react { useState, useRef, useEffect }
+import from react { useState, useRef, useEffect, useLayoutEffect }
 import from "@jac/runtime" { jacIsLoggedIn }
 import from "@mantine/core" { ScrollArea }
 import from "@tabler/icons-react" { IconBook, IconX, IconMenu2 }
@@ -27,6 +27,25 @@ def:pub JacChatbot() -> JsxElement {
     chat = useChat();
     isAuthenticated = jacIsLoggedIn();
     scrollAreaRef = useRef(None);
+    viewportRef = useRef(None);
+    spacerRef = useRef(None);
+
+    # Resize spacer via DOM ref before paint — no state, no re-render, no vibration
+    useLayoutEffect(lambda -> None {
+        vp = viewportRef.current;
+        ref = chat.latestUserMsgRef.current;
+        spacer = spacerRef.current;
+        if vp and ref and spacer {
+            oldH = spacer.offsetHeight;
+            contentH = vp.scrollHeight - oldH;
+            belowMsg = contentH - (ref.offsetTop + ref.offsetHeight);
+            needed = vp.clientHeight - belowMsg;
+            if needed < 0 {
+                needed = 0;
+            }
+            spacer.style.height = String(needed) + "px";
+        }
+    }, [chat.messages]);
 
     # Add CSS animations on mount
     useEffect(lambda -> None {
@@ -98,7 +117,24 @@ def:pub JacChatbot() -> JsxElement {
                 </div>);
             }
         }
-        allMessageItems.push(<div key={msg.id} style={{"animation": "fadeIn 0.3s ease"}}>
+        allMessageItems.push(<div key={msg.id} style={{"animation": "fadeIn 0.3s ease"}}>);
+    }
+    # Build message items - split to insert reasoning before the streaming message
+    # Find last user message ID for scroll-to-top ref
+    lastUserMsgId = "";
+    for msg in chat.messages {
+        if msg.isUser {
+            lastUserMsgId = msg.id;
+        }
+    }
+
+    allMessageItems = [];
+    for msg in chat.messages {
+        msgRef = None;
+        if msg.id == lastUserMsgId {
+            msgRef = chat.latestUserMsgRef;
+        }
+        allMessageItems.push(<div key={msg.id} ref={msgRef} style={{"animation": "fadeIn 0.3s ease", "scrollMarginTop": "16px"}}>
             <ChatMessage
                 message={msg.content}
                 isUser={msg.isUser}
@@ -172,7 +208,7 @@ def:pub JacChatbot() -> JsxElement {
     mainContent = None;
     if hasMessages {
         # Active conversation - messages area
-        mainContent = <ScrollArea ref={scrollAreaRef} style={{"flex": "1", "paddingLeft": "16px", "paddingRight": "16px"}} type="scroll">
+        mainContent = <ScrollArea ref={scrollAreaRef} viewportRef={viewportRef} style={{"flex": "1", "paddingLeft": "16px", "paddingRight": "16px"}} type="scroll">
             <div style={{
                 "maxWidth": "768px",
                 "margin": "0 auto",
@@ -190,6 +226,7 @@ def:pub JacChatbot() -> JsxElement {
                     {loadingContent}
                 </div>
                 <div ref={chat.messagesEndRef} />
+                <div ref={spacerRef} />
             </div>
         </ScrollArea>;
     } else {

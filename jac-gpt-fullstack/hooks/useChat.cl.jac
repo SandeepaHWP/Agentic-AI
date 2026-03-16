@@ -18,10 +18,12 @@ def:pub useChat() -> any {
     has isSearchingDocs: bool = False;
     has reasoningSteps: list = [];
     has isReasoning: bool = False;
+    has streamDoneSignal: int = 0;
 
     messagesEndRef = useRef(None);
     firstChunkRef = useRef(False);
     prevMessageCountRef = useRef(0);
+    latestUserMsgRef = useRef(None);
     abortControllerRef = useRef(None);
     isAuthenticated = jacIsLoggedIn();
 
@@ -56,17 +58,31 @@ def:pub useChat() -> any {
         }
     }, [messageCount]);
 
-    # Scroll to bottom only when new messages are added (not during streaming updates)
+    # Scroll latest user message to top when new messages are added
     useEffect(lambda -> None {
         currentCount = messages.length;
         # Only scroll if message count increased (new message added)
         if currentCount > prevMessageCountRef.current {
-            if messagesEndRef.current {
-                messagesEndRef.current.scrollIntoView({"behavior": "smooth"});
-            }
+            setTimeout(lambda -> None {
+                if latestUserMsgRef.current {
+                    latestUserMsgRef.current.scrollIntoView({"behavior": "smooth", "block": "start"});
+                }
+            }, 100);
         }
         prevMessageCountRef.current = currentCount;
     }, [messages]);
+
+    # Re-anchor scroll after full response stream completes
+    # Use auto (no animation) to prevent visible flicker when reasoning collapses
+    useEffect(lambda -> None {
+        if streamDoneSignal > 0 {
+            requestAnimationFrame(lambda -> None {
+                if latestUserMsgRef.current {
+                    latestUserMsgRef.current.scrollIntoView({"behavior": "auto", "block": "start"});
+                }
+            });
+        }
+    }, [streamDoneSignal]);
 
     async def initSession() -> None {
         newSessionId = generateSessionId();
@@ -249,9 +265,6 @@ def:pub useChat() -> any {
                     };
                 }
             }
-            
-            # Clear abort controller after completion
-            abortControllerRef.current = None;
         } except Exception as e {
             console.error("Send message error:", e);
             errorMessage = {
@@ -263,6 +276,12 @@ def:pub useChat() -> any {
             messages = lambda prev: any -> any { return prev.concat([errorMessage]); };
             # Stop loading on error
             isLoading = False;
+        } finally {
+            # Clear abort controller after completion
+            abortControllerRef.current = None;
+
+            # Signal that streaming is fully done so scroll re-anchors
+            streamDoneSignal = lambda prev: int -> int { return prev + 1; };
         }
     }
 
@@ -389,6 +408,7 @@ def:pub useChat() -> any {
         "reasoningSteps": reasoningSteps,
         "isReasoning": isReasoning,
         "messagesEndRef": messagesEndRef,
+        "latestUserMsgRef": latestUserMsgRef,
         "canSendMessage": canSendMessage,
         "handleSendMessage": handleSendMessage,
         "handleNewChat": handleNewChat,

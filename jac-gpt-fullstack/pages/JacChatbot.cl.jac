@@ -117,7 +117,7 @@ def:pub JacChatbot() -> JsxElement {
                 </div>);
             }
         }
-        allMessageItems.push(<div key={msg.id} style={{"animation": "fadeIn 0.3s ease"}}>);
+        allMessageItems.push(<div key={msg.id} style={{"animation": "fadeIn 0.3s ease"}}></div>);
     }
     # Build message items - split to insert reasoning before the streaming message
     # Find last user message ID for scroll-to-top ref

@@ -147,6 +147,13 @@ obj McpClient {
                 return f"MCP client unavailable: {e}. Try again or use search_docs instead.";
             }
         }
+            try {
+                self._initialize();
+                self._list_tools();
+            } except Exception as e {
+                return f"MCP client unavailable: {e}. Try again or use search_docs instead.";
+            }
+        }
             return "MCP client is not available — use search_docs instead.";
         }
         try {

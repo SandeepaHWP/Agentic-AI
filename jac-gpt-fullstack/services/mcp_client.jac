@@ -10,7 +10,7 @@ import json;
 import requests;
 
 obj McpClient {
-    has _base_url: str = "http://localhost:3001";
+    has _base_url: str = "https://mcp.jaseci.org";
     has _tools: list = [];
     has _initialized: bool = False;
     has _rpc_id: int = 0;
@@ -147,15 +147,7 @@ obj McpClient {
                 return f"MCP client unavailable: {e}. Try again or use search_docs instead.";
             }
         }
-            try {
-                self._initialize();
-                self._list_tools();
-            } except Exception as e {
-                return f"MCP client unavailable: {e}. Try again or use search_docs instead.";
-            }
-        }
-            return "MCP client is not available — use search_docs instead.";
-        }
+            
         try {
             resp = self._send_rpc("tools/call", {"name": name, "arguments": args});
             content = resp.get("result", {}).get("content", []);

@@ -15,9 +15,11 @@ def stream_chat_response(response_generator: any, visitor: any) -> any {
       }
    }
 
-   session_node = ([root-->(?:Session)](?id==visitor.session_id))[0];
-   session_node.chat_history.append({"role": "assistant", "content": response});
-   session_node.updated_at = datetime.now().isoformat();
+   if not visitor.skip_history {
+      session_node = ([root-->(?:Session)](?id==visitor.session_id))[0];
+      session_node.chat_history.append({"role": "assistant", "content": response});
+      session_node.updated_at = datetime.now().isoformat();
+   }
    
    return;
 }
@@ -231,14 +233,8 @@ impl Session.chat {
    }
 
    # Save user message to chat history only for the primary call (not skip_history)
-   if not visitor.skip_history {
-      session_node = ([root-->(?:Session)](?id==visitor.session_id))[0];
-      session_node.chat_history.append({"role": "assistant", "content": response});
-      session_node.updated_at = datetime.now().isoformat();
-   }
-      self.chat_history.append({"role": "user", "content": visitor.message});
-      self.updated_at = datetime.now().isoformat();
-   }
+   self.chat_history.append({"role": "user", "content": visitor.message});
+   self.updated_at = datetime.now().isoformat();
 
    visitor.chat_history = self.chat_history;
 

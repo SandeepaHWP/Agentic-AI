@@ -127,7 +127,7 @@ def:pub ReasoningStep(step: any, index: int) -> JsxElement {
 
 
 """Agent reasoning panel - collapsible display of all intermediate steps."""
-def:pub AgentReasoning(steps: list, isActive: bool = false) -> JsxElement {
+def:pub AgentReasoning(steps: list, isActive: bool = false, title: str = "Agent Reasoning", elapsedMs: int = 0) -> JsxElement {
     has isOpen: bool = true;
     stepsEndRef = useRef(None);
 
@@ -147,9 +147,13 @@ def:pub AgentReasoning(steps: list, isActive: bool = false) -> JsxElement {
         toggleIcon = <IconChevronDown size={14} />;
     }
 
-    headerLabel = "Agent Reasoning";
+    headerLabel = title;
     if steps.length > 0 {
-        headerLabel = "Agent Reasoning (" + String(steps.length) + " steps)";
+        headerLabel = title + " (" + String(steps.length) + " steps)";
+    }
+    if elapsedMs > 0 {
+        elapsedSec = (elapsedMs / 1000).toFixed(1);
+        headerLabel = headerLabel + " · " + String(elapsedSec) + "s";
     }
 
     borderBottom = "none";

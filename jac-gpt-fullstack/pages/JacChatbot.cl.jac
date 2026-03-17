@@ -88,6 +88,44 @@ def:pub JacChatbot() -> JsxElement {
         docPanelOpen = not docPanelOpen;
     }
 
+    # Build message items — reasoning panels inserted inline before each bot message
+    allMessageItems = [];
+    for msg in chat.messages {
+        if not msg.isUser and msg.source == "RAG" {
+            hasRagReasoning = (msg.reasoningSteps and msg.reasoningSteps.length > 0) or msg.isReasoning;
+            if hasRagReasoning {
+                allMessageItems.push(<div key={msg.id + "_rag_reasoning"}>
+                    <AgentReasoning
+                        steps={msg.reasoningSteps or []}
+                        isActive={msg.isReasoning or False}
+                        title="RAG Reasoning"
+                        elapsedMs={msg.elapsedMs or 0}
+                    />
+                </div>);
+            }
+        }
+        if not msg.isUser and msg.source == "MCP" {
+            hasMcpReasoning = (msg.reasoningSteps and msg.reasoningSteps.length > 0) or msg.isReasoning;
+            if hasMcpReasoning {
+                allMessageItems.push(<div key={msg.id + "_mcp_reasoning"}>
+                    <AgentReasoning
+                        steps={msg.reasoningSteps or []}
+                        isActive={msg.isReasoning or False}
+                        title="MCP Reasoning"
+                        elapsedMs={msg.elapsedMs or 0}
+                    />
+                </div>);
+            }
+        }
+        allMessageItems.push(<div key={msg.id} style={{"animation": "fadeIn 0.3s ease", "scrollMarginTop": "16px"}}>
+             <ChatMessage
+                message={msg.content}
+                isUser={msg.isUser}
+                timestamp={msg.timestamp}
+                source={msg.source or ""}
+            />
+        </div>);
+    }
     # Build message items - split to insert reasoning before the streaming message
     # Find last user message ID for scroll-to-top ref
     lastUserMsgId = "";
@@ -97,29 +135,23 @@ def:pub JacChatbot() -> JsxElement {
         }
     }
 
-    allMessageItems = [];
-    for msg in chat.messages {
-        msgRef = None;
-        if msg.id == lastUserMsgId {
-            msgRef = chat.latestUserMsgRef;
-        }
-        allMessageItems.push(<div key={msg.id} ref={msgRef} style={{"animation": "fadeIn 0.3s ease", "scrollMarginTop": "16px"}}>
-            <ChatMessage
-                message={msg.content}
-                isUser={msg.isUser}
-                timestamp={msg.timestamp}
-            />
-        </div>);
-    }
+    # allMessageItems = [];
+    # for msg in chat.messages {
+    #     msgRef = None;
+    #     if msg.id == lastUserMsgId {
+    #         msgRef = chat.latestUserMsgRef;
+    #     }
+    #     allMessageItems.push(<div key={msg.id} ref={msgRef} style={{"animation": "fadeIn 0.3s ease", "scrollMarginTop": "16px"}}>
+    #         <ChatMessage
+    #             message={msg.content}
+    #             isUser={msg.isUser}
+    #             timestamp={msg.timestamp}
+    #             source={msg.source or ""}
+    #         />
+    #     </div>);
+    # }
 
-    # When reasoning is active, insert it above the last (streaming bot) message
-    hasReasoningToShow = chat.reasoningSteps.length > 0 or chat.isReasoning;
     messageItems = allMessageItems;
-    lastMessageItem = None;
-    if hasReasoningToShow and allMessageItems.length > 0 {
-        messageItems = allMessageItems.slice(0, -1);
-        lastMessageItem = allMessageItems[allMessageItems.length - 1];
-    }
 
     # Loading indicator with bouncing dots (sequential bounce)
     loadingIndicator = <div style={{
@@ -169,17 +201,14 @@ def:pub JacChatbot() -> JsxElement {
     hasMessages = chat.messages.length > 0;
 
     loadingContent = None;
-    showThinking = chat.isLoading and not chat.isReasoning and chat.reasoningSteps.length == 0;
+    showThinking = chat.isLoading and not chat.ragIsReasoning and not chat.mcpIsReasoning and chat.ragReasoningSteps.length == 0 and chat.mcpReasoningSteps.length == 0;
+    if chat.mode == "rag" {
+        showThinking = chat.isLoading and not chat.ragIsReasoning and chat.ragReasoningSteps.length == 0;
+    } elif chat.mode == "mcp" {
+        showThinking = chat.isLoading and not chat.mcpIsReasoning and chat.mcpReasoningSteps.length == 0;
+    }
     if showThinking {
         loadingContent = loadingIndicator;
-    }
-
-    reasoningContent = None;
-    if chat.reasoningSteps.length > 0 or chat.isReasoning {
-        reasoningContent = <AgentReasoning
-            steps={chat.reasoningSteps}
-            isActive={chat.isReasoning}
-        />;
     }
 
     # Messages content or empty state
@@ -201,8 +230,6 @@ def:pub JacChatbot() -> JsxElement {
                     "gap": "8px"
                 }}>
                     {messageItems}
-                    {reasoningContent}
-                    {lastMessageItem}
                     {loadingContent}
                 </div>
                 <div ref={chat.messagesEndRef} />
@@ -247,6 +274,8 @@ def:pub JacChatbot() -> JsxElement {
                         placeholder="Ask about Jac syntax, functions, loops, classes, or request code examples..."
                         isLoading={chat.isLoading}
                         onStop={chat.handleStopGeneration}
+                        mode={chat.mode}
+                        onModeChange={chat.setMode}
                     />
                     
                     <div style={{
@@ -448,6 +477,8 @@ def:pub JacChatbot() -> JsxElement {
                         placeholder="Ask about Jac syntax, functions, loops, classes, or request code examples..."
                         isLoading={chat.isLoading}
                         onStop={chat.handleStopGeneration}
+                        mode={chat.mode}
+                        onModeChange={chat.setMode}
                     />
                     if hasMessages else None
                 )}

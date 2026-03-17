@@ -12,7 +12,9 @@ def:pub ChatInput(
     disabled: bool = False,
     placeholder: str = "Ask about Jac syntax, functions, loops, classes, or request code examples...",
     isLoading: bool = False,
-    onStop: any = None
+    onStop: any = None,
+    mode: str = "rag",
+    onModeChange: any = None
 ) -> JsxElement {
     has inputValue: str = "";
     has isFocused: bool = False;
@@ -175,5 +177,50 @@ def:pub ChatInput(
                 </button>
             </div>
         </form>
+
+        {<div style={{
+            "maxWidth": "768px",
+            "margin": "4px auto 0 auto",
+            "display": "flex",
+            "justifyContent": "center"
+        }}>
+            <div style={{
+                "display": "inline-flex",
+                "borderRadius": "20px",
+                "border": "1px solid rgba(55, 65, 81, 0.5)",
+                "background": "#09090b",
+                "padding": "3px",
+                "gap": "2px"
+            }}>
+                {[
+                    {"value": "rag", "label": "RAG", "activeColor": "rgba(59, 130, 246, 0.25)", "activeBorder": "rgba(59, 130, 246, 0.5)", "activeText": "#93c5fd"},
+                    {"value": "mcp", "label": "MCP", "activeColor": "rgba(168, 85, 247, 0.25)", "activeBorder": "rgba(168, 85, 247, 0.5)", "activeText": "#c4b5fd"},
+                    {"value": "both", "label": "Both", "activeColor": "rgba(249, 115, 22, 0.25)", "activeBorder": "rgba(249, 115, 22, 0.5)", "activeText": "#fdba74"}
+                ].map(lambda opt: any -> any {
+                    isActive = mode == opt.value;
+                    return <button
+                        key={opt.value}
+                        type="button"
+                        disabled={isLoading}
+                        onClick={lambda -> None { onModeChange(opt.value); }}
+                        style={{
+                            "padding": "4px 14px",
+                            "borderRadius": "16px",
+                            "border": (("1px solid " + opt.activeBorder if isActive else "1px solid transparent")),
+                            "background": ((opt.activeColor if isActive else "transparent")),
+                            "color": ((opt.activeText if isActive else "#9ca3af")),
+                            "fontSize": "12px",
+                            "fontWeight": (("600" if isActive else "400")),
+                            "cursor": (("not-allowed" if isLoading else "pointer")),
+                            "opacity": (("0.5" if isLoading else "1")),
+                            "transition": "all 200ms ease",
+                            "fontFamily": "system-ui, -apple-system, sans-serif"
+                        }}
+                    >
+                        {opt.label}
+                    </button>;
+                })}
+            </div>
+        </div> if onModeChange else None}
     </div>;
 }

@@ -23,14 +23,7 @@ jac install
 export OPENAI_API_KEY=your_openai_api_key
 ```
 
-4. Start the MCP server in streamble-http:
-
-```bash
-jac mcp --transport streamable-http --port 3001
-```
-
-
-5. Start the application:
+4. Start the application:
 
 ```bash
 jac start main.jac

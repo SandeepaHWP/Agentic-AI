@@ -117,7 +117,14 @@ def:pub JacChatbot() -> JsxElement {
                 </div>);
             }
         }
-        allMessageItems.push(<div key={msg.id} style={{"animation": "fadeIn 0.3s ease"}}></div>);
+        allMessageItems.push(<div key={msg.id} style={{"animation": "fadeIn 0.3s ease", "scrollMarginTop": "16px"}}>
+             <ChatMessage
+                message={msg.content}
+                isUser={msg.isUser}
+                timestamp={msg.timestamp}
+                source={msg.source or ""}
+            />
+        </div>);
     }
     # Build message items - split to insert reasoning before the streaming message
     # Find last user message ID for scroll-to-top ref
@@ -128,21 +135,21 @@ def:pub JacChatbot() -> JsxElement {
         }
     }
 
-    allMessageItems = [];
-    for msg in chat.messages {
-        msgRef = None;
-        if msg.id == lastUserMsgId {
-            msgRef = chat.latestUserMsgRef;
-        }
-        allMessageItems.push(<div key={msg.id} ref={msgRef} style={{"animation": "fadeIn 0.3s ease", "scrollMarginTop": "16px"}}>
-            <ChatMessage
-                message={msg.content}
-                isUser={msg.isUser}
-                timestamp={msg.timestamp}
-                source={msg.source or ""}
-            />
-        </div>);
-    }
+    # allMessageItems = [];
+    # for msg in chat.messages {
+    #     msgRef = None;
+    #     if msg.id == lastUserMsgId {
+    #         msgRef = chat.latestUserMsgRef;
+    #     }
+    #     allMessageItems.push(<div key={msg.id} ref={msgRef} style={{"animation": "fadeIn 0.3s ease", "scrollMarginTop": "16px"}}>
+    #         <ChatMessage
+    #             message={msg.content}
+    #             isUser={msg.isUser}
+    #             timestamp={msg.timestamp}
+    #             source={msg.source or ""}
+    #         />
+    #     </div>);
+    # }
 
     messageItems = allMessageItems;
 

@@ -1,23 +1,26 @@
 """MCP client singleton using Streamable HTTP transport.
 
-Connects to an MCP server running at `jac mcp --transport streamable-http --port 3001`
-via POST /mcp (bidirectional streaming with JSON-RPC over HTTP / SSE).
-
-Imported by jacServer.jac and passed as ReAct tools to LLM nodes.
+Spawns a local MCP server via:
+    jac mcp --transport streamable-http --port 3001
+then connects to it at http://localhost:3001/mcp.
 """
 
 import json;
 import requests;
+import subprocess;
+import time;
 
 obj McpClient {
-    has _base_url: str = "https://mcp.jaseci.org";
+    has _base_url: str = "http://localhost:3001";
     has _tools: list = [];
     has _initialized: bool = False;
     has _rpc_id: int = 0;
     has _session_id: str = "";
+    has _server_process: any = None;
 
     def postinit() {
         try {
+            self._start_server();
             self._initialize();
             self._list_tools();
             print(f"[MCP] Client ready — {len(self._tools)} tool(s) discovered.");
@@ -27,6 +30,30 @@ obj McpClient {
     }
 
     # ── Private helpers ────────────────────────────────────────────────────────
+
+    """Launch `jac mcp --transport streamable-http --port 3001` as a background
+    subprocess and wait until the server is accepting connections."""
+    def _start_server() {
+        self._server_process = subprocess.Popen(
+            ["jac", "mcp", "--transport", "streamable-http", "--port", "3001"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        );
+
+        # Poll until the server is ready (up to 10 seconds)
+        max_retries = 20;
+        retry_delay = 0.5;
+        for _ in range(max_retries) {
+            try {
+                resp = requests.get(f"{self._base_url}/", timeout=1);
+                print("[MCP] Server is up.");
+                return;
+            } except Exception {
+                time.sleep(retry_delay);
+            }
+        }
+        print("[MCP] Warning: server may not be ready yet, proceeding anyway.");
+    }
 
     def _make_id() -> str {
         self._rpc_id += 1;
@@ -147,7 +174,7 @@ obj McpClient {
                 return f"MCP client unavailable: {e}. Try again or use search_docs instead.";
             }
         }
-            
+
         try {
             resp = self._send_rpc("tools/call", {"name": name, "arguments": args});
             content = resp.get("result", {}).get("content", []);
@@ -169,6 +196,16 @@ obj McpClient {
             return "MCP tool returned no content.";
         } except Exception as e {
             return f"MCP call failed: {e}";
+        }
+    }
+
+    """Terminate the background MCP server subprocess if it is running."""
+    def stop_server() -> None {
+        if self._server_process {
+            self._server_process.terminate();
+            self._server_process.wait();
+            print("[MCP] Server process terminated.");
+            self._server_process = None;
         }
     }
 }

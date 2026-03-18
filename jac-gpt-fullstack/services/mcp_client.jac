@@ -44,6 +44,13 @@ obj McpClient {
         max_retries = 20;
         retry_delay = 0.5;
         for _ in range(max_retries) {
+            # Check if process exited early (e.g. command not found)
+            exit_code = self._server_process.poll();
+            if exit_code is not None {
+                stderr_out = self._server_process.stderr.read().decode("utf-8", errors="ignore");
+                print(f"[MCP] Server process exited with code {exit_code}: {stderr_out.strip()}");
+                return;
+            }
             try {
                 resp = requests.get(f"{self._base_url}/", timeout=1);
                 print("[MCP] Server is up.");

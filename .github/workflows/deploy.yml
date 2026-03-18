@@ -49,7 +49,7 @@ jobs:
       - name: Install Jaseci packages
         run: |
           pip install --upgrade pip
-          pip install jaclang jac-client byllm
+          pip install jaclang jac-client byllm jac-mcp
           git clone --depth 1 --branch main https://github.com/jaseci-labs/jaseci.git /tmp/jaseci
           pip install -e /tmp/jaseci/jac-scale
 

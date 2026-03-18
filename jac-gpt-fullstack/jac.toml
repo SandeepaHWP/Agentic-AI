@@ -13,6 +13,7 @@ langchain-chroma = ">=0.0.0"
 pypdf = ">=0.0.0"
 sentence-transformers = ">=0.0.0"
 faiss-cpu = ">=0.0.0"
+jac-mcp = ">=0.0.0"
 
 [dependencies.npm]
 jac-client-node = "1.0.7"
